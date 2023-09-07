@@ -1,4 +1,5 @@
-import { Component } from 'react';
+// import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import { getImages } from 'services/api';
 import ImageGallery from './ImageGallery/ImageGallery';
 import BtnLoadMore from './Button/Button';
@@ -6,66 +7,58 @@ import Searchbar from './Searchbar/Searchbar';
 import { GlobalStyle } from './GlobalStyled';
 import { AppSection } from './App.Style';
 
-export class App extends Component {
-  state = {
-    searchQuery: '',
-    images: [],
-    isLoading: false,
-    page: 1,
-    totalHits: 0,
+export const App = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [images, setImages] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalHits, setTotalHits] = useState(0);
+  const [error, setError] = useState('');
+
+  const handleChange = newQuery => {
+    setSearchQuery(`${Date.now()}/${newQuery}`);
+    setImages([]);
+    setPage(1);
   };
 
-  handleChange = newQuery => {
-    this.setState({
-      searchQuery: `${Date.now()}/${newQuery}`,
-      images: [],
-      page: 1,
-    });
-  };
-
-  componentDidUpdate = async (prevProps, prevState) => {
-    const { searchQuery, page } = this.state;
-    if (prevState.searchQuery !== searchQuery || prevState.page !== page) {
+  useEffect(() => {
+    if (searchQuery === '') {
+      return;
+    }
+    async function fetchImages() {
       try {
-        this.setState({ isLoading: true });
+        setIsLoading(true);
         const response = await getImages(searchQuery, page);
-        this.setState(prevState => ({
-          images: [...prevState.images, ...response.data.hits],
-          totalHits: response.data.totalHits,
-        }));
+        setImages(images => [...images, ...response.data.hits]);
+        setTotalHits(response.data.totalHits);
       } catch (error) {
-        this.setState({ error });
+        setError('Whoops, something went wrong');
       } finally {
-        this.setState({ isLoading: false });
+        setIsLoading(false);
       }
     }
+    fetchImages();
+  }, [searchQuery, page]);
+
+  const ButtonMore = () => {
+    setPage(prevState => prevState + 1);
   };
 
-  handleBtnMore = async () => {
-    this.setState(prevState => ({
-      page: prevState.page + 1,
-    }));
-  };
+  return (
+    <AppSection>
+      <Searchbar submit={handleChange} />
 
-  render() {
-    const { images, isLoading, error, page, totalHits } = this.state;
+      {error && <p>Whoops, something went wrong</p>}
+      {isLoading && <p>Loading...</p>}
+      {images.length > 0 && <ImageGallery images={images} />}
 
-    return (
-      <AppSection>
-        <Searchbar submit={this.handleChange} />
+      {images.length === 0 || page >= totalHits / 12 ? (
+        <></>
+      ) : (
+        <BtnLoadMore clickLoadMore={ButtonMore} />
+      )}
 
-        {error && <p>Whoops, something went wrong: {error.message}</p>}
-        {isLoading && <p>Loading...</p>}
-        {images.length > 0 && <ImageGallery images={images} />}
-
-        {images.length === 0 || page >= totalHits / 12 ? (
-          <></>
-        ) : (
-          <BtnLoadMore clickLoadMore={this.handleBtnMore} />
-        )}
-
-        <GlobalStyle />
-      </AppSection>
-    );
-  }
-}
+      <GlobalStyle />
+    </AppSection>
+  );
+};
